@@ -1,0 +1,8 @@
+/dist/
+node_modules/
+# @kind:store
+/target/
+/provider.wasm
+.cargo/
+*.rs.bk
+# @end
