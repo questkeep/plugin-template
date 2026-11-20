@@ -64,7 +64,7 @@ jobs:
       # The copy is a repository of its own, like a project created from the template.
       - name: Create the plugin from the template
         run: |
-          mkdir "$RUNNER_TEMP/demo"
+          mkdir -p "$RUNNER_TEMP/demo"
           git archive HEAD | tar -x -C "$RUNNER_TEMP/demo"
           cd "$RUNNER_TEMP/demo"
           git init -q -b main
