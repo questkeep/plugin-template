@@ -1,0 +1,11 @@
+{
+  "id": "my-plugin",
+  "name": "My Plugin",
+  "summary": "A Questkeep plugin made from the plugin template.",
+  "description": "A Questkeep plugin made from the plugin template.",
+  "author": "Your Name",
+  "repository": "https://github.com/OWNER/my-plugin",
+  "license": "MIT",
+  "tags": [],
+  "kinds": ["store", "extension", "theme"]
+}

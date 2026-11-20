@@ -1,0 +1,55 @@
+{
+  "id": "my-plugin",
+  "name": "My Plugin",
+  "version": "0.1.0",
+  "description": "A Questkeep plugin made from the plugin template.",
+  "author": "Your Name",
+  "icon": "icon.svg",
+  "apiVersion": 1,
+  "providers": [{ "wasm": "provider.wasm" }],
+  "permissions": {
+    "folders": [
+      {
+        "key": "games",
+        "label": "Games folder",
+        "hint": "The folder that holds your games, one folder per game. Questkeep gives the plugin read-only access to it.",
+        "as": "/games",
+        "default": "~/Games"
+      }
+    ],
+    "http": []
+  },
+  "extension": {
+    "main": "main.js",
+    "styles": ["style.css"],
+    "settings": [
+      {
+        "key": "greet",
+        "label": "Say hello when the plugin starts",
+        "hint": "Shows a short message each time the plugin is loaded.",
+        "type": "toggle",
+        "default": true
+      }
+    ]
+  },
+  "themes": [
+    {
+      "id": "my-plugin",
+      "name": "My Plugin",
+      "description": "A starting point for a theme: its own palette for light and dark, and one option.",
+      "css": "themes/my-plugin.css",
+      "params": [
+        {
+          "key": "accent",
+          "label": "Accent color",
+          "type": "color",
+          "default": { "light": "#2b6cb0", "dark": "#63b3ed" }
+        }
+      ],
+      "preview": {
+        "light": ["#f7f9fc", "#ffffff", "#1a202c", "#2b6cb0"],
+        "dark": ["#10151c", "#18202a", "#e6edf5", "#63b3ed"]
+      }
+    }
+  ]
+}
