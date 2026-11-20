@@ -1,0 +1,365 @@
+name: Release
+
+# Manual "Release" button. Turns the pending changesets in `.changeset/` into a version, builds and
+# packs the plugin, commits the version bump to main, tags it and publishes a GitHub release. The
+# notes and the job summary end with the entry for the plugin registry's versions.json. See
+# docs/RELEASING.md.
+# @kind:template
+#
+# Lines between "# @kind:<kind>" and "# @end" belong to one kind of plugin (store, extension,
+# theme); `npm run init` keeps the blocks of the kinds you chose.
+# @end
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: compute the version, build and pack, but commit, tag and publish nothing"
+        type: boolean
+        default: false
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: "24"
+  # Where the plugin is listed. The lowest Questkeep version that can run the plugin (registry
+  # `minApp`) is the first line of registry/min-app.
+  REGISTRY_REPO: questkeep/plugins
+
+jobs:
+  prepare:
+    name: Plan release
+    runs-on: ubuntu-latest
+    outputs:
+      has_release: ${{ steps.plan.outputs.has_release }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - name: Require main for a real release
+        if: ${{ !inputs.dry_run && github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Real releases can only run from main (this run is on ${GITHUB_REF}). Use dry_run on other branches."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Compute version and notes
+        id: plan
+        run: node scripts/release/changeset.mjs plan --out-dir "$RUNNER_TEMP/release-meta" --github-output
+
+      - name: Nothing to release
+        if: steps.plan.outputs.has_release != 'true'
+        run: |
+          echo "::notice::No pending changesets in .changeset/, so there is nothing to release."
+          echo "No pending changesets, nothing to release." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Summary
+        if: steps.plan.outputs.has_release == 'true'
+        env:
+          CURRENT: ${{ steps.plan.outputs.current }}
+          VERSION: ${{ steps.plan.outputs.version }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          {
+            echo "## Release v${VERSION} (from ${CURRENT})"
+            [ "$DRY_RUN" = "true" ] && echo "**Dry run:** nothing will be committed, tagged or published."
+            echo
+            cat "$RUNNER_TEMP/release-meta/notes.md"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release metadata
+        if: steps.plan.outputs.has_release == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-meta
+          path: ${{ runner.temp }}/release-meta/*
+          retention-days: 7
+          if-no-files-found: error
+
+  build:
+    name: Build and pack
+    needs: prepare
+    if: needs.prepare.outputs.has_release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # @kind:store
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: release
+
+      # @end
+      - name: Write version ${{ env.VERSION }} into the project files
+        run: node scripts/release/changeset.mjs version --write "$VERSION"
+
+      # @kind:store
+      - name: Build provider.wasm
+        run: sh ./build.sh
+
+      # @end
+      - name: Pack
+        id: pack
+        run: node scripts/pack.mjs
+
+      - name: Download release metadata
+        uses: actions/download-artifact@v8
+        with:
+          name: release-meta
+          path: ${{ runner.temp }}/release-meta
+
+      # The notes of the GitHub release (and the job summary) end with the registry entry.
+      - name: Write the registry entry and the final notes
+        env:
+          SHA256: ${{ steps.pack.outputs.sha256 }}
+          SIZE: ${{ steps.pack.outputs.size }}
+        run: |
+          meta="$RUNNER_TEMP/release-meta"
+          out="$RUNNER_TEMP/package"
+          mkdir -p "$out"
+          id="$(node -p 'JSON.parse(require("fs").readFileSync("plugin.json", "utf8")).id')"
+          file="${id}-${VERSION}.zip"
+          node scripts/release/registry-entry.mjs --version "$VERSION" --repo "$GITHUB_REPOSITORY" \
+            --file "$file" --sha256 "$SHA256" --size "$SIZE" \
+            --released "$(date -u +%F)" --notes "$meta/notes.md" --out "$out/registry-entry.json"
+          entry="$(cat "$out/registry-entry.json")"
+          fence='```'
+          registry="$(
+            printf '\n### Registry entry\n\n'
+            printf 'Append this to `plugins/%s/versions.json` in https://github.com/%s :\n\n' "$id" "$REGISTRY_REPO"
+            printf '%sjson\n%s\n%s\n' "$fence" "$entry" "$fence"
+          )"
+          # The notes without trailing blank lines, then the registry block.
+          printf '%s\n%s\n' "$(cat "$meta/notes.md")" "$registry" > "$out/release-notes.md"
+          cp "dist/$file" "$out/"
+          printf '## Package %s\n\n`sha256 %s`, %s bytes\n%s\n' "$file" "$SHA256" "$SIZE" "$registry" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the package
+        uses: actions/upload-artifact@v7
+        with:
+          name: package
+          path: ${{ runner.temp }}/package/*
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    name: Commit, tag and publish
+    needs: [prepare, build]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+          fetch-tags: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Download release metadata and package
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/artifacts
+
+      # The id and the name come from plugin.json, so nothing in this file names the plugin.
+      - name: Read the plugin id and name
+        run: |
+          echo "PLUGIN_ID=$(node -p 'JSON.parse(require("fs").readFileSync("plugin.json", "utf8")).id')" >> "$GITHUB_ENV"
+          echo "PLUGIN_NAME=$(node -p 'JSON.parse(require("fs").readFileSync("plugin.json", "utf8")).name')" >> "$GITHUB_ENV"
+
+      # Three states, so a re-run can finish what an earlier run left half done:
+      #   complete    the tag v$VERSION is on origin: only the GitHub release is (re)published.
+      #   commit-only origin/main's head is `chore(release): v$VERSION` but the tag is missing (the
+      #               commit push worked, the tag push failed): tag that commit and push the tag.
+      #               The changesets are already consumed, so the version commit is not made again.
+      #   fresh       nothing was pushed: commit, tag and push everything.
+      - name: Check how far v${{ env.VERSION }} got (re-run)
+        id: existing
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${VERSION}" > /dev/null; then
+            echo "state=complete" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tag v${VERSION} already exists; skipping the commit and tag and only publishing the release."
+          elif [ "$(git log -1 --format=%s HEAD)" = "chore(release): v${VERSION}" ]; then
+            echo "state=commit-only" >> "$GITHUB_OUTPUT"
+            echo "::notice::main already has the release commit of v${VERSION} but no tag; tagging it."
+          else
+            echo "state=fresh" >> "$GITHUB_OUTPUT"
+          fi
+
+      # fresh: main must still be the commit that was built. commit-only: main moved by exactly the
+      # release commit, so that commit must sit directly on the commit that was built (for a re-run
+      # the dispatched sha is the one before the release commit); anything else was not built here.
+      - name: Make sure main did not move during the build
+        if: steps.existing.outputs.state != 'complete'
+        env:
+          STATE: ${{ steps.existing.outputs.state }}
+        run: |
+          if [ "$STATE" = "commit-only" ]; then
+            if [ "$(git rev-parse HEAD^)" != "$GITHUB_SHA" ] && [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+              echo "::error::The release commit $(git rev-parse HEAD) is not directly on ${GITHUB_SHA}, the commit that was built. Do not tag it; investigate."
+              exit 1
+            fi
+          elif [ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]; then
+            echo "::error::main moved from ${GITHUB_SHA} to $(git rev-parse HEAD) while the release was building. Run the release again so the build matches what is tagged."
+            exit 1
+          fi
+
+      - name: Commit version bump and delete changesets
+        if: steps.existing.outputs.state == 'fresh'
+        run: |
+          node scripts/release/changeset.mjs version --write "$VERSION"
+          node scripts/release/changeset.mjs consume --list "$RUNNER_TEMP/artifacts/release-meta/consumed.txt"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .changeset plugin.json
+          # @kind:store
+          git add Cargo.toml Cargo.lock
+          # @end
+          git commit -m "chore(release): v${VERSION}"
+
+      # Both pushes are retried; the commit goes first so a failed tag push leaves a state the
+      # next run recognizes as commit-only.
+      - name: Push the release commit
+        if: steps.existing.outputs.state == 'fresh'
+        run: |
+          . scripts/release/retry.sh
+          retry git push origin HEAD:main
+
+      - name: Tag the release commit and push the tag
+        if: steps.existing.outputs.state != 'complete'
+        run: |
+          . scripts/release/retry.sh
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "${PLUGIN_NAME} v${VERSION}" HEAD
+          retry git push origin "v${VERSION}"
+
+      - name: Create GitHub release
+        run: |
+          . scripts/release/retry.sh
+          zip="$RUNNER_TEMP/artifacts/package/${PLUGIN_ID}-${VERSION}.zip"
+          notes="$RUNNER_TEMP/artifacts/package/release-notes.md"
+          # The whole decision is retried: a create whose answer was lost has still made the release.
+          publish() {
+            if gh release view "v${VERSION}" > /dev/null 2>&1; then
+              gh release upload "v${VERSION}" "$zip" --clobber
+            else
+              gh release create "v${VERSION}" "$zip" \
+                --verify-tag \
+                --title "${PLUGIN_NAME} v${VERSION}" \
+                --notes-file "$notes"
+            fi
+          }
+          retry publish
+
+      # Optional: a registry pull request, in one of two ways. Without either the entry in the
+      # release notes is pasted into the registry by hand. Never fails the release.
+      #   1. The GitHub App of the questkeep organization (variable PLUGIN_RELEASE_APP_ID, secret
+      #      PLUGIN_RELEASE_APP_PRIVATE_KEY; contents and pull requests write on questkeep/plugins).
+      #      It only exists for repositories of that organization.
+      #   2. The secret REGISTRY_TOKEN: a token of yours that may push a branch to your fork of
+      #      questkeep/plugins and open a pull request there (see docs/RELEASING.md).
+      - name: Create a registry token (GitHub App)
+        id: registry-token
+        if: vars.PLUGIN_RELEASE_APP_ID != ''
+        continue-on-error: true
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.PLUGIN_RELEASE_APP_ID }}
+          private-key: ${{ secrets.PLUGIN_RELEASE_APP_PRIVATE_KEY }}
+          owner: questkeep
+          repositories: plugins
+
+      - name: Open a registry pull request
+        continue-on-error: true
+        env:
+          APP_TOKEN: ${{ steps.registry-token.outputs.token }}
+          FORK_TOKEN: ${{ secrets.REGISTRY_TOKEN }}
+        run: |
+          if [ -n "$APP_TOKEN" ]; then
+            mode=app
+            token="$APP_TOKEN"
+          elif [ -n "$FORK_TOKEN" ]; then
+            mode=fork
+            token="$FORK_TOKEN"
+          else
+            echo "::notice::No registry token (GitHub App variables or the REGISTRY_TOKEN secret): add the registry entry from the release notes to ${REGISTRY_REPO} by hand."
+            exit 0
+          fi
+          export GH_TOKEN="$token"
+          . "$GITHUB_WORKSPACE/scripts/release/retry.sh"
+          git clone --depth 1 "https://x-access-token:${token}@github.com/${REGISTRY_REPO}.git" "$RUNNER_TEMP/registry"
+          cd "$RUNNER_TEMP/registry"
+          branch="${PLUGIN_ID}-v${VERSION}"
+          git checkout -b "$branch"
+          # The listing (meta.json and the icon) lives in this repository and is synced on every
+          # release, so the first release creates the registry entry and later ones keep it current.
+          icon="$(node -p 'JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).icon ?? ""' "$GITHUB_WORKSPACE/plugin.json")"
+          mkdir -p "plugins/${PLUGIN_ID}"
+          cp "$GITHUB_WORKSPACE/registry/meta.json" "plugins/${PLUGIN_ID}/meta.json"
+          if [ -n "$icon" ]; then
+            rm -f "plugins/${PLUGIN_ID}"/icon.svg "plugins/${PLUGIN_ID}"/icon.png
+            cp "$GITHUB_WORKSPACE/$icon" "plugins/${PLUGIN_ID}/icon.${icon##*.}"
+          fi
+          node -e '
+            const fs = require("node:fs");
+            const file = `plugins/${process.argv[2]}/versions.json`;
+            const versions = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
+            const entry = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+            if (versions.some((v) => v.version === entry.version)) {
+              console.log("version already listed");
+            } else {
+              versions.push(entry);
+              fs.writeFileSync(file, JSON.stringify(versions, null, 2) + "\n");
+            }
+          ' "$RUNNER_TEMP/artifacts/package/registry-entry.json" "$PLUGIN_ID"
+          git add "plugins/${PLUGIN_ID}"
+          if git diff --cached --quiet; then
+            echo "::notice::The registry already lists v${VERSION}."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "feat(${PLUGIN_ID}): v${VERSION}"
+          if [ "$mode" = "app" ]; then
+            retry git push --force origin "$branch"
+            head="$branch"
+          else
+            # The branch goes to the token owner's fork of the registry.
+            login="$(gh api user --jq .login)"
+            gh repo view "${login}/plugins" > /dev/null 2>&1 || gh repo fork "$REGISTRY_REPO" --clone=false
+            git remote add fork "https://x-access-token:${token}@github.com/${login}/plugins.git"
+            retry git push --force fork "$branch"
+            head="${login}:${branch}"
+          fi
+          gh pr create --repo "$REGISTRY_REPO" --head "$head" \
+            --title "${PLUGIN_ID} v${VERSION}" \
+            --body "Adds ${PLUGIN_NAME} v${VERSION} (release: https://github.com/${GITHUB_REPOSITORY}/releases/tag/v${VERSION})."
