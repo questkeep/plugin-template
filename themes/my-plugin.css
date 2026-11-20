@@ -1,0 +1,46 @@
+/*
+ * A theme of this plugin. Every rule is written against :root[data-theme="my-plugin"], the theme's
+ * id in plugin.json, so nothing here applies while another theme is active.
+ *
+ * Questkeep sets data-scheme="light" or "dark" and data-theme="<id>" on <html>. A theme overrides
+ * --qk-* variables; whatever it leaves out keeps the default theme's value for that mode. The list
+ * of variables is ui/src/theme.css in the Questkeep repository (the theme editor in the app,
+ * Settings > Appearance > Create theme, shows them with their current values and can export a
+ * finished theme as a plugin). The format is described in the wiki: Theme-Reference.
+ *
+ * The "accent" parameter of plugin.json needs no rule: the base palette reads --qk-param-accent
+ * by itself and derives hover and soft shades from it.
+ *
+ * Keep text readable: at least 4.5:1 against the surfaces.
+ */
+
+/* The palette, per mode. */
+:root[data-theme="my-plugin"][data-scheme="dark"] {
+  --qk-color-bg: #10151c;
+  --qk-color-surface: #18202a;
+  --qk-color-surface-raised: #202a36;
+  --qk-color-surface-hover: #293545;
+  --qk-color-surface-active: #34445a;
+  --qk-color-border: #2c394a;
+  --qk-color-text: #e6edf5;
+  --qk-color-text-muted: #aebccd;
+  --qk-color-text-faint: #8496ac;
+  --qk-color-backdrop: #05080dcc;
+}
+:root[data-theme="my-plugin"][data-scheme="light"] {
+  --qk-color-bg: #f7f9fc;
+  --qk-color-surface: #ffffff;
+  --qk-color-surface-raised: #ffffff;
+  --qk-color-surface-hover: #edf2f8;
+  --qk-color-surface-active: #dfe8f2;
+  --qk-color-border: #d5deea;
+  --qk-color-text: #1a202c;
+  --qk-color-text-muted: #4a5568;
+  --qk-color-text-faint: #647084;
+  --qk-color-backdrop: #1a202c66;
+}
+
+/* Variables for both modes: sizes and shape. */
+:root[data-theme="my-plugin"] {
+  --qk-radius-scale: 1.25;
+}
