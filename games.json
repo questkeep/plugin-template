@@ -1,0 +1,19 @@
+[
+  {
+    "id": "sample-adventure",
+    "name": "Sample Adventure",
+    "exe": "Sample Adventure/adventure.exe",
+    "description": "A made-up game that this template lists. Put a file called adventure.exe into a folder called Sample Adventure inside the Games folder you chose, and it shows up as installed."
+  },
+  {
+    "id": "sample-racer",
+    "name": "Sample Racer",
+    "exe": "Sample Racer/racer.exe",
+    "description": "Another made-up game. It is listed even when its files are missing, as a game you own but have not installed."
+  },
+  {
+    "id": "sample-puzzle",
+    "name": "Sample Puzzle",
+    "exe": "Sample Puzzle/puzzle.exe"
+  }
+]

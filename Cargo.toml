@@ -1,0 +1,44 @@
+[package]
+name = "my-plugin"
+description = "A Questkeep store plugin"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/OWNER/my-plugin"
+publish = false
+
+[lib]
+# The component is built as `provider.wasm` (scripts/build.mjs, build.sh and build.ps1 copy it
+# next to plugin.json). `rlib` lets `cargo test` and clippy build the crate natively.
+name = "provider"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The plugin SDK is part of the Questkeep repository and pinned to a release tag. To move to a
+# newer SDK, change the tag to the Questkeep release you target, run `cargo update -p
+# questkeep-plugin-sdk` and raise `registry/min-app` to that Questkeep version when you use
+# something new in it.
+questkeep-plugin-sdk = { git = "https://github.com/questkeep/questkeep", tag = "v0.6.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+
+# To develop against a local checkout of Questkeep instead of the tagged release, add this to a
+# `.cargo/config.toml` of your own (git-ignored here) or temporarily to this file:
+#
+#   [patch."https://github.com/questkeep/questkeep"]
+#   questkeep-plugin-sdk = { path = "../questkeep/crates/questkeep-plugin-sdk" }
