@@ -392,8 +392,10 @@ export function applyPlan(root, plan) {
     if (full !== root && !full.startsWith(`${root}${path.sep}`)) throw new Error(`refusing to touch ${rel}`);
     return full;
   };
-  // package.json carries the "already initialised" marker, so it is written last of all: until
-  // then a run that failed halfway can simply be started again.
+  // package.json carries the "already initialised" marker, so it is written last of all: a run
+  // that dies halfway (a full disk, say) still looks like an uninitialised template. Reset the
+  // folder (git restore . and git clean -fd) before running init again, because the files it
+  // already rewrote no longer match what it expects.
   const last = "package.json";
   for (const [rel, text] of plan.writes) {
     if (rel === last) continue;
