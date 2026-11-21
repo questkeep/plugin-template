@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Turns this template into your plugin. Dependency-free (Node 24, `node:` built-ins only).
+// Turns this template into your plugin. Dependency-free (Node 26, `node:` built-ins only).
 //
 //   node scripts/init.mjs <id> "<Display Name>" [--kinds store,extension,theme]
 //        [--author "<name>"] [--description "<text>"] [--repo <owner/repo>]
@@ -343,7 +343,7 @@ export function planInit(root, options) {
   const nextPkg = { ...pkg };
   delete nextPkg[MARKER];
   nextPkg.name = id;
-  nextPkg.description = `Release tooling of the ${name} Questkeep plugin (no dependencies, Node 24).`;
+  nextPkg.description = `Release tooling of the ${name} Questkeep plugin (no dependencies, Node 26).`;
   nextPkg.scripts = { ...pkg.scripts };
   delete nextPkg.scripts.init;
   if (!has("store")) delete nextPkg.scripts.build;

@@ -39,7 +39,7 @@ interface can, so this one only does what is described here.
 <!-- @end -->
 ## Develop
 
-Needs [Node.js](https://nodejs.org) 24 or newer.
+Needs [Node.js](https://nodejs.org) 26 or newer.
 <!-- @kind:store -->
 The store also needs [Rust](https://rustup.rs) and `rustup target add wasm32-wasip2`.
 <!-- @end -->

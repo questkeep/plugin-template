@@ -15,7 +15,7 @@ One plugin can be any combination of the three.
 ## Getting started
 
 1. Click **Use this template** on GitHub (**Create a new repository**), then clone it.
-2. Set up the toolchain with [mise](https://mise.jdx.dev) (Node 24, and for a store Rust with
+2. Set up the toolchain with [mise](https://mise.jdx.dev) (Node 26, and for a store Rust with
    `wasm32-wasip2`): see [Setting up the toolchain](#setting-up-the-toolchain) at the end.
 3. Run init in the clone:
 
