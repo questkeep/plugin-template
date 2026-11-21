@@ -4,7 +4,9 @@
 // (https://github.com/questkeep/questkeep):
 //
 //   crates/questkeep-plugins/src/manifest.rs  (`PluginManifest::validate`, `check_mount`,
-//                                              `check_relative`, `check_icon_path`, `HostRule`)
+//                                              `check_relative`, `check_icon_path`, `HostRule`,
+//                                              `validate_login`, `is_valid_process_name`,
+//                                              `is_valid_domain`, `https_host`, `domain_allowed`)
 //     - id: 2 to 64 of [a-z0-9-], not starting with a dash
 //     - name is not blank; version is not blank; apiVersion equals API_VERSION (1)
 //     - every provider's `wasm`, `icon`, `extension.main` and every theme's `css` is a plain path
@@ -17,6 +19,13 @@
 //       `default` (when given) is not blank, `as` follows the mount rules above
 //     - permissions.http: each entry is a host rule (`api.example.com`, `*.example.com`,
 //       `http://localhost`)
+//     - permissions.filesystem and permissions.registry: when present, the string "read"
+//     - permissions.launcher.processNames: plain executable file names (no path or wildcard
+//       characters, no control characters, no surrounding spaces, at most 255 characters)
+//     - permissions.login: a non-blank `title`; a non-empty `domains` list of plain host names
+//       (no `*.`, scheme, path or port); `url`, `capture.urlPrefix`, `session.url` and
+//       `session.renewUrl` are https URLs without userinfo on one of the domains or a subdomain;
+//       `capture.param` is not blank; `script` and `session.script` are plain plugin paths
 //   ui/src/lib/pluginThemes.ts  (`parseThemeEntry`): a theme has an id of 2 to 64 of [a-z0-9-] that
 //       is the plugin's id or starts with it and a dash, a name, and a `css` path of plain parts
 //   ui/src/lib/extensions/declaredSettings.ts  (`normalizeSettings`): the host silently drops a
@@ -35,6 +44,7 @@ export const MAX_ICON_BYTES = 200 * 1024;
 export const SETTING_TYPES = ["toggle", "text", "number", "select", "color"];
 
 const ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/;
+const PROCESS_NAME_FORBIDDEN_RE = /[/\\:*?"<>|\u0000-\u001f\u007f]/;
 const FOLDER_KEY_RE = /^[a-z0-9-]{1,32}$/;
 
 export const isValidId = (id) => typeof id === "string" && ID_RE.test(id);
@@ -75,6 +85,76 @@ function checkHost(host) {
       .split(".")
       .every((l) => l !== "" && !l.startsWith("-") && !l.endsWith("-") && /^[a-z0-9_-]+$/.test(l))
   );
+}
+
+/** A plain executable file name, like `is_valid_process_name` in manifest.rs. */
+export const isValidProcessName = (name) =>
+  typeof name === "string" &&
+  name.trim() !== "" &&
+  name.length <= 255 &&
+  !PROCESS_NAME_FORBIDDEN_RE.test(name) &&
+  name === name.trim();
+
+/** A host name for `login.domains`: a web permission without `*.`, scheme or port. */
+const isValidDomain = (domain) =>
+  typeof domain === "string" &&
+  !domain.includes("://") &&
+  !/^\s*(\*\.|https?:)/i.test(domain) &&
+  checkHost(domain);
+
+/** The host of an `https://` URL, or null for anything else (also URLs with userinfo). */
+function httpsHost(url) {
+  if (typeof url !== "string" || !url.startsWith("https://")) return null;
+  const authority = url.slice("https://".length).split(/[/?#]/)[0];
+  if (authority === "" || authority.includes("@")) return null;
+  const host = authority.split(":")[0].toLowerCase().replace(/\.+$/, "");
+  return host === "" ? null : host;
+}
+
+const domainAllowed = (domains, host) =>
+  domains.some((d) => {
+    const domain = String(d).toLowerCase();
+    return host === domain || host.endsWith(`.${domain}`);
+  });
+
+/** Checks `permissions.login` like `validate_login` in manifest.rs. */
+function checkLogin(login, add, checkFile) {
+  if (typeof login !== "object" || login === null || Array.isArray(login)) {
+    add("The sign-in permission must be an object.");
+    return;
+  }
+  if (typeof login.title !== "string" || login.title.trim() === "") add("The sign-in window has no title.");
+  const domains = Array.isArray(login.domains) ? login.domains : [];
+  if (domains.length === 0) {
+    add("The sign-in permission lists no domains: name the hosts the sign-in windows visit.");
+  }
+  for (const domain of domains) {
+    if (!isValidDomain(domain)) {
+      add(`The sign-in domain "${domain}" is not valid: use a host name such as gog.com (subdomains are included).`);
+    }
+  }
+  const onDomain = (url, what) => {
+    const host = httpsHost(url);
+    if (host === null || !domainAllowed(domains, host)) {
+      add(`${what} "${url}" must be an https address on one of the sign-in domains.`);
+    }
+  };
+  onDomain(login.url, "The sign-in address");
+  if (login.capture !== undefined && login.capture !== null) {
+    if (typeof login.capture.param !== "string" || login.capture.param.trim() === "") {
+      add("The sign-in capture names no parameter.");
+    }
+    onDomain(login.capture.urlPrefix, "The sign-in capture address");
+  }
+  if (login.script !== undefined && login.script !== null) checkFile(login.script, "The sign-in script");
+  const session = login.session;
+  if (session !== undefined && session !== null) {
+    onDomain(session.url, "The website session address");
+    checkFile(session.script, "The website session script");
+    if (session.renewUrl !== undefined && session.renewUrl !== null) {
+      onDomain(session.renewUrl, "The website session renewal address");
+    }
+  }
 }
 
 /**
@@ -200,6 +280,22 @@ export function validateManifest(manifest, fileExists = () => true) {
   for (const host of manifest.permissions?.http ?? []) {
     if (!checkHost(host)) add(`The web permission "${host}" is not valid.`);
   }
+  for (const key of ["filesystem", "registry"]) {
+    const access = manifest.permissions?.[key];
+    if (access !== undefined && access !== null && access !== "read") {
+      add(`The ${key} permission must be "read" (the only access level there is).`);
+    }
+  }
+  const launcher = manifest.permissions?.launcher;
+  if (launcher !== undefined && launcher !== null) {
+    for (const name of launcher.processNames ?? []) {
+      if (!isValidProcessName(name)) {
+        add(`The launcher process name "${name}" is not valid: use a file name such as steam.exe.`);
+      }
+    }
+  }
+  const login = manifest.permissions?.login;
+  if (login !== undefined && login !== null) checkLogin(login, add, checkFile);
 
   const brings =
     (Array.isArray(providers) && providers.length > 0) ||

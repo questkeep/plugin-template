@@ -63,6 +63,57 @@ test("validateManifest checks permissions.folders like the host", () => {
   assert.ok(check([folder], [{ path: "~/X", as: "/games" }]).length > 0);
 });
 
+test("validateManifest checks filesystem, registry and launcher permissions like the host", () => {
+  const base = { id: "my-store", name: "X", version: "1.0.0", apiVersion: 1, providers: [{ wasm: "provider.wasm" }] };
+  const check = (permissions) => validateManifest({ ...base, permissions });
+  assert.deepEqual(check({ filesystem: "read", registry: "read" }), []);
+  assert.deepEqual(check({ launcher: { processNames: ["steam.exe", "Steam Client.exe"] } }), []);
+  assert.ok(check({ filesystem: "write" }).length > 0);
+  assert.ok(check({ filesystem: true }).length > 0);
+  assert.ok(check({ registry: "all" }).length > 0);
+  for (const name of ["", " ", "C:\\steam.exe", "bin/steam.exe", "*.exe", "a|b.exe", "steam.exe ", "a\u0001.exe"]) {
+    assert.ok(check({ launcher: { processNames: [name] } }).length > 0, `process name "${name}"`);
+  }
+});
+
+test("validateManifest checks permissions.login like the host", () => {
+  const base = { id: "my-store", name: "X", version: "1.0.0", apiVersion: 1, providers: [{ wasm: "provider.wasm" }] };
+  const login = {
+    title: "Sign in to Example",
+    url: "https://auth.example.com/login",
+    domains: ["example.com"],
+    capture: { param: "code", urlPrefix: "https://auth.example.com/done" },
+    script: "login.js",
+    session: { url: "https://www.example.com/account", script: "session.js", renewUrl: "https://example.com/renew" },
+  };
+  const check = (change, exists = () => true) =>
+    validateManifest({ ...base, permissions: { login: { ...login, ...change } } }, exists);
+  assert.deepEqual(check({}), []);
+  assert.deepEqual(check({ capture: undefined, script: undefined, session: undefined }), []);
+  assert.deepEqual(check({ userAgent: "Mozilla/5.0" }), []);
+  assert.ok(check({ title: " " }).length > 0);
+  assert.ok(check({ domains: [] }).length > 0);
+  assert.ok(check({ domains: undefined }).length > 0);
+  for (const domain of ["*.example.com", "https://example.com", "example.com/path", "example.com:8443", "", "-x.com"]) {
+    assert.ok(check({ domains: [domain], url: "https://example.com/" }).length > 0, `domain "${domain}"`);
+  }
+  assert.ok(check({ url: "http://auth.example.com/login" }).length > 0);
+  assert.ok(check({ url: "https://user@auth.example.com/login" }).length > 0);
+  assert.ok(check({ url: "https://evilexample.com/login" }).length > 0);
+  assert.ok(check({ url: "https://example.com.evil.net/login" }).length > 0);
+  assert.deepEqual(check({ url: "https://EXAMPLE.com:8443/login" }), []);
+  assert.ok(check({ capture: { param: " ", urlPrefix: login.capture.urlPrefix } }).length > 0);
+  assert.ok(check({ capture: { param: "code", urlPrefix: "https://other.net/done" } }).length > 0);
+  assert.ok(check({ session: { ...login.session, url: "https://other.net/" } }).length > 0);
+  assert.ok(check({ session: { ...login.session, renewUrl: "http://example.com/renew" } }).length > 0);
+  assert.ok(check({ session: { ...login.session, script: "../s.js" } }).length > 0);
+  assert.ok(check({ session: { url: login.session.url } }).length > 0);
+  assert.ok(check({ script: "/abs.js" }).length > 0);
+  assert.ok(check({ script: "C:/x.js" }).length > 0);
+  assert.ok(check({}, (p) => p !== "login.js").some((p) => /login\.js/.test(p)));
+  assert.ok(check({}, (p) => p !== "session.js").some((p) => /session\.js/.test(p)));
+});
+
 test("validateManifest follows the host's rules", () => {
   const ok = {
     id: "my-store",
