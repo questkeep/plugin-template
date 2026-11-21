@@ -15,8 +15,8 @@ One plugin can be any combination of the three.
 ## Getting started
 
 1. Click **Use this template** on GitHub (**Create a new repository**), then clone it.
-2. Needs [Node.js](https://nodejs.org) 24 or newer; for a store also
-   [Rust](https://rustup.rs) and `rustup target add wasm32-wasip2`.
+2. Set up the toolchain with [mise](https://mise.jdx.dev) (Node 24, and for a store Rust with
+   `wasm32-wasip2`): see [Setting up the toolchain](#setting-up-the-toolchain) at the end.
 3. Run init in the clone:
 
    ```sh
@@ -153,3 +153,33 @@ tutorials for a
 ## License
 
 MIT, see [`LICENSE`](LICENSE). See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+## Setting up the toolchain
+
+1. **Install [mise](https://mise.jdx.dev)**, which installs the right toolchain:
+
+   Linux and macOS:
+
+   ```bash
+   curl https://mise.run | sh
+   ```
+
+   macOS with Homebrew: `brew install mise`
+
+   Windows:
+
+   ```powershell
+   winget install jdx.mise
+   ```
+
+   Then [activate mise in your shell](https://mise.jdx.dev/getting-started.html#activate-mise) and
+   open a new terminal.
+
+2. **Run `mise install`** in the repository folder.
+
+3. **Windows only, for a store: install the Visual Studio Build Tools** with the C++ workload (needed
+   to compile Rust code; mise cannot install it). In an administrator terminal:
+
+   ```powershell
+   winget install --id Microsoft.VisualStudio.2022.BuildTools --exact --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+   ```

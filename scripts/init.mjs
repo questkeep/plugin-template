@@ -350,7 +350,7 @@ export function planInit(root, options) {
   writes.set("package.json", `${JSON.stringify(nextPkg, null, 2)}\n`);
 
   // Text files with kind blocks.
-  for (const file of [".github/workflows/ci.yml", ".github/workflows/release.yml", ".gitignore", "docs/RELEASING.md", "THIRD_PARTY_NOTICES.md"]) {
+  for (const file of [".github/workflows/ci.yml", ".github/workflows/release.yml", "mise.toml", ".gitignore", "docs/RELEASING.md", "THIRD_PARTY_NOTICES.md"]) {
     if (exists(file)) writes.set(file, processBlocks(read(file), kinds));
   }
 

@@ -26,7 +26,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  NODE_VERSION: "24"
   # Where the plugin is listed. The lowest Questkeep version that can run the plugin (registry
   # `minApp`) is the first line of registry/min-app.
   REGISTRY_REPO: questkeep/plugins
@@ -50,9 +49,10 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: actions/setup-node@v7
+      # Only Node is needed here.
+      - uses: jdx/mise-action@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          install_args: node
 
       - name: Compute version and notes
         id: plan
@@ -97,15 +97,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+      - uses: jdx/mise-action@v5
 
       # @kind:store
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-wasip2
-
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: release
@@ -180,9 +174,10 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - uses: actions/setup-node@v7
+      # Only Node is needed here.
+      - uses: jdx/mise-action@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          install_args: node
 
       - name: Download release metadata and package
         uses: actions/download-artifact@v8

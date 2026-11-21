@@ -14,7 +14,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  NODE_VERSION: "24"
 
 # @kind:template
 # Lines between "# @kind:<kind>" and "# @end" belong to one kind of plugin (store, extension,
@@ -29,16 +28,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
-        with:
-          node-version: ${{ env.NODE_VERSION }}
+      - uses: jdx/mise-action@v5
 
       # @kind:store
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-          targets: wasm32-wasip2
-
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}

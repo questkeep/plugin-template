@@ -224,6 +224,7 @@ for (const kinds of COMBINATIONS) {
         "LICENSE",
         "THIRD_PARTY_NOTICES.md",
         "package.json",
+        "mise.toml",
         ".gitignore",
         ".editorconfig",
         ".changeset/README.md",
@@ -306,9 +307,14 @@ for (const kinds of COMBINATIONS) {
       const ci = fs.readFileSync(path.join(dir, ".github/workflows/ci.yml"), "utf8");
       const release = fs.readFileSync(path.join(dir, ".github/workflows/release.yml"), "utf8");
       for (const [text, what] of [[ci, "ci"], [release, "release"]]) {
-        assert.equal(text.includes("wasm32-wasip2"), has("store"), `${what}: wasm target`);
-        assert.equal(text.includes("rust-toolchain"), has("store"), `${what}: rust toolchain`);
+        assert.equal(text.includes("wasm32-wasip2"), false, `${what}: the toolchain comes from mise.toml`);
+        assert.ok(!text.includes("rust-toolchain"), `${what}: the toolchain comes from mise.toml`);
       }
+      // mise.toml: Node always, Rust (with the wasm target) only for stores.
+      const mise = fs.readFileSync(path.join(dir, "mise.toml"), "utf8");
+      assert.ok(mise.includes("node ="), "mise: node");
+      assert.equal(mise.includes("rust ="), has("store"), "mise: rust");
+      assert.equal(mise.includes("wasm32-wasip2"), has("store"), "mise: wasm target");
       assert.equal(ci.includes("cargo clippy"), has("store"));
       assert.equal(ci.includes("node --check main.js"), has("extension"));
       assert.equal(release.includes("git add Cargo.toml Cargo.lock"), has("store"));

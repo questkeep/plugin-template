@@ -16,7 +16,7 @@ of the kinds the user picks. Nothing here is ever published as a plugin.
 | All script tests (release tooling, zip, manifest rules, **init**) | `npm test` |
 | Try init without changing anything | `node scripts/init.mjs demo-plugin "Demo Plugin" --kinds store,theme --yes --dry-run` |
 | Store checks | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` |
-| Build the sample store | `npm run build` (needs `rustup target add wasm32-wasip2`) |
+| Build the sample store | `npm run build` (needs the `wasm32-wasip2` target, set up by `mise install`) |
 | Pack the placeholder plugin | `node scripts/pack.mjs` |
 
 Never run init in this working copy (it deletes init): copy the folder first, or run the tests, which

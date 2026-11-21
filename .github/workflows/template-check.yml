@@ -21,7 +21,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  NODE_VERSION: "24"
 
 jobs:
   generated:
@@ -41,18 +40,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
+      # The template's mise.toml also lists Rust (the store kind); the generated plugin's does only
+      # for stores.
+      - uses: jdx/mise-action@v5
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          install_args: ${{ contains(matrix.kinds, 'store') && 'node rust' || 'node' }}
 
       - name: Template's own script tests (including init)
         run: node --test scripts/release/*.test.mjs scripts/*.test.mjs
-
-      - uses: dtolnay/rust-toolchain@stable
-        if: contains(matrix.kinds, 'store')
-        with:
-          components: clippy, rustfmt
-          targets: wasm32-wasip2
 
       - uses: Swatinem/rust-cache@v2
         if: contains(matrix.kinds, 'store')
