@@ -41,6 +41,11 @@ combinations on CI and then the generated plugin's checks.
 
 ## Conventions
 
+- **Toolchain pins:** `mise.toml` pins exact versions; `.github/workflows/update-toolchain.yml` (calls
+  `questkeep/workflows`) lists every pinned tool in its `tools` input with a version label (`lts`,
+  `latest` or a prefix). **When you add or remove a tool in `mise.toml`, update that list in the same
+  change**; the workflow fails when a pinned tool is missing from it. Generated plugins keep the workflow; its list names Rust even for non-store plugins
+  (a listed tool that `mise.toml` does not pin is skipped).
 - When you change a template file, check that init still works for all seven combinations
   (`npm test` covers the file sets and manifests; for Rust changes also build a generated store).
 - The manifest checker `scripts/manifest.mjs` mirrors the host's rules (`crates/questkeep-plugins/src/manifest.rs`
