@@ -116,7 +116,19 @@ its `CONTRIBUTING.md`): the first release creates the folder `plugins/<id>/` the
 `registry/meta.json` and `icon`, and every later release appends the version. The release workflow
 can open that pull request for you with a GitHub App (only for the questkeep organization) or a
 `REGISTRY_TOKEN` secret of your own; without either it prints the entry for you to paste. Set
-`registry/min-app` to the lowest Questkeep version your plugin needs.
+`registry/min-app` to the lowest Questkeep version your plugin needs: 0.7.0 as soon as a store uses
+`permissions.folders`, `filesystem`, `registry`, `launcher` or `login` (older apps ignore those fields).
+
+### What a store can reach
+
+A store runs sandboxed: it sees its own plugin folder and `/data`, and only reaches more through
+`permissions` in `plugin.json`: web hosts (`http`), folders (`read`, or `folders` that the user
+points somewhere), read-only access to every file (`filesystem`) or to the registry (`registry`),
+the store launcher's program names (`launcher`) and a sign-in window locked to some domains
+(`login`). Declare the minimum. A plugin that reads everything the user can read is reviewed hardest on
+its web hosts, because those are the only way out of the PC. Keep tokens in the SDK's `secrets`
+module (the system keyring), never in `/data`. Details: [PLUGINS.md](https://github.com/questkeep/questkeep/blob/main/docs/PLUGINS.md) and the wiki page
+[Plugin Manifest Reference](https://github.com/questkeep/questkeep/wiki/Plugin-Manifest-Reference).
 
 ## Template maintenance
 

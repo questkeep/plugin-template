@@ -84,7 +84,9 @@ request instead).
 The registry ([`questkeep/plugins`](https://github.com/questkeep/plugins)) points at the release zip
 and pins its sha256. It is reviewed: read its
 [CONTRIBUTING.md](https://github.com/questkeep/plugins/blob/main/CONTRIBUTING.md) first (public
-repository, license, no obfuscated code, permissions that are the minimum the plugin needs).
+repository, license, no obfuscated code, permissions that are the minimum the plugin needs; a plugin that reads everything, with `filesystem` or
+`registry`, gets its web hosts checked most closely, and tokens belong in the SDK's `secrets`, not in
+`/data`).
 
 **One-time steps**
 
@@ -92,7 +94,7 @@ repository, license, no obfuscated code, permissions that are the minimum the pl
    `kinds`) and replace `icon.svg` with your icon (square, at most 200 KB for the plugin icon).
    `npm run init` filled in what it knew.
 2. Set the lowest Questkeep version that can run the plugin in `registry/min-app` (the first line;
-   the registry's `minApp`). A store with `permissions.folders` needs 0.7.0.
+   the registry's `minApp`). A store with `permissions.folders`, `filesystem`, `registry`, `launcher` or `login` needs 0.7.0.
 3. Make the repository public before the first listing.
 4. Decide how the pull request is made, see below. The first one adds the plugin to the registry and
    a maintainer reviews it; later releases only append a version.

@@ -54,7 +54,12 @@ Never invoke `python` in scripts: on stock Windows it is a Microsoft Store stub 
 
 - Conventional Commits. Every user-visible change adds a changeset; docs/CI-only changes do not.
 - The plugin `id` never changes (it is the plugin's identity). Raise `registry/min-app` when you use
-  something only newer Questkeep versions have.
+  something only newer Questkeep versions have: `permissions.folders`, `filesystem`, `registry`,
+  `launcher` and `login` need 0.7.0 (older apps ignore them).
+- Declare the minimum permissions. A store that reads everything (`filesystem`, `registry`) is
+  reviewed hardest on its web hosts (`permissions.http`, `login.domains`): no wildcards, only the
+  store's own hosts. Tokens go to the SDK's `secrets` module, never to `/data`. See
+  [PLUGINS.md](https://github.com/questkeep/questkeep/blob/main/docs/PLUGINS.md) and the wiki's [Plugin Manifest Reference](https://github.com/questkeep/questkeep/wiki/Plugin-Manifest-Reference).
 - Never commit `dist/`.
 <!-- @kind:store -->
 - Never commit `provider.wasm` or `target/`: they are build output.

@@ -16,7 +16,9 @@ A [Questkeep](https://github.com/questkeep/questkeep) plugin: {{kinds}}.
 
 The store lists the sample games of `games.json` (replace them with what your store really reads).
 It asks for one folder, the **Games folder** (`permissions.folders` in `plugin.json`): choose it in
-Settings, Plugins, {{name}}, Folders. Questkeep gives the plugin read-only access to that folder only.
+Settings, Plugins, {{name}}, Folders. Questkeep gives the plugin read-only access to that folder only. (Stores can ask for more: every file or
+the registry read-only, the launcher's program names, a sign-in window. See the
+[plugin docs](https://github.com/questkeep/questkeep/blob/main/docs/PLUGINS.md); those need Questkeep 0.7.0.)
 A game is listed as installed when its executable is in the folder (for the samples:
 `Sample Adventure/adventure.exe`), and as owned otherwise.
 

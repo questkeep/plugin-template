@@ -45,6 +45,9 @@ combinations on CI and then the generated plugin's checks.
   (`npm test` covers the file sets and manifests; for Rust changes also build a generated store).
 - The manifest checker `scripts/manifest.mjs` mirrors the host's rules (`crates/questkeep-plugins/src/manifest.rs`
   and two UI files, listed at its top). Update both lists together when the host changes.
+- New `permissions` fields (`filesystem`, `registry`, `launcher`, `login`, `folders`) need Questkeep 0.7.0.
+  The sample store only uses `folders` and the SDK dependency below has none of the newer host APIs
+  (`secrets` and the like) yet: do not use them here before the SDK tag moves.
 - The SDK dependency in `Cargo.toml` is pinned to a Questkeep tag; `registry/min-app` is the
   matching minimum app version. Bump them together, regenerate `Cargo.lock` and run the checks.
 - The release tooling is generic: it reads the plugin id and name from `plugin.json`. Do not
